@@ -1,18 +1,17 @@
 /* Basic parser, shows the structure but there's no code generation */
 #include <iostream>
-#include "include/lex.h"
-#include "include/retval.h"
 #include <stdarg.h>
+#include "include/lex.h"
+#include "include/arg.h"
 #include "include/name.h"
 using namespace std;
 
 #define MAXFIRST 16
 #define SYNCH SEMI
 
-static const char* term();
-static const char* factor();
-static const char* expression();
-
+static void term(const char** tempvar);
+static void factor(const char** tempvar);
+static void expression(const char** tempvar);
 
 int legal_lookahead(int first_arg, ...) {
 /*
@@ -65,7 +64,7 @@ void statements() {
 
 	const char* tempvar = nullptr;
 	while (!match(EOI)) {
-		tempvar = expression();
+		expression(&tempvar);
 		if (match(SEMI))
 			advance();
 		else cout << yylineno << ": Inserting missing semicolon\n";
@@ -73,69 +72,65 @@ void statements() {
 	}
 }
 
-static const char* expression() {
+static void expression(const char** tempvar) {
 	/* expression  -> term expression'
 	 * expression' -> PLUS term expression' 
 	 *              | epsilon
 	 */
 
-	const char* tempvar = nullptr, * tempvar2 = nullptr;
+	const char* tempvar2 = nullptr;
 
 	if (!legal_lookahead(NUM_OR_ID, LP, 0))
-		return tempvar;
+		return;
 
-	tempvar = term();
+	term(&(*tempvar));
 	while (match(PLUS)) {
 		advance();
-		tempvar2 = term();
-		cout << tempvar << "+=" << tempvar2 << endl;
+		term(&tempvar2);
+		cout << *tempvar << "+=" << tempvar2 << endl;
 		freename(tempvar2);
 	}
-	return tempvar;
 }
 
-static const char* term() {
+static void term(const char** tempvar) {
 	/* term  -> factor term'
 	 * term' -> TIMES factor term' 
 	 *        | epsilon
 	 */
 
-	const char* tempvar = nullptr, * tempvar2 = nullptr;
+	const char* tempvar2 = nullptr;
 
 	if (!legal_lookahead(NUM_OR_ID, LP, 0))
-		return tempvar;
+		return;
 
-	tempvar = factor();
+	factor(&(*tempvar));
 	while (match(TIMES)) {
 		advance();
-		tempvar2 = factor();
-		cout << tempvar << "*=" << tempvar2 << endl;
+		factor(&tempvar2);
+		cout << *tempvar << "*=" << tempvar2 << endl;
 		freename(tempvar2);
 	}
-	return tempvar;
 }
 
-static const char* factor() {
+static void factor(const char** tempvar) {
 	/* factor  -> NUM_OR_ID
 	 *          | LP expression RP
 	 */
 
-	const char* tempvar = nullptr;
+	*tempvar = nullptr;
 
 	if (!legal_lookahead(NUM_OR_ID, LP, 0))
-		return tempvar;
+		return;
 
 	if (match(NUM_OR_ID)) {
-		tempvar = newname();
-		cout << tempvar << "=" << *yyTextItr << endl;
+		*tempvar = newname();
+		cout << *tempvar << "=" << *yyTextItr << endl;
 		advance();
 	} else if (match(LP)) {
 		advance();
-		tempvar = expression();
+		expression(tempvar);
 		if (match(RP))
 			advance();
 		else cout << yylineno << ": Mismatched parenthesis" << endl;
 	} else cout << yylineno << ": Number of identifier expected" << endl;
-
-	return tempvar;
 }
